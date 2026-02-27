@@ -32,6 +32,28 @@ This service is non-blocking by design:
 - Moved file cleanup to worker lifecycle to avoid request race issues.
 - Added explicit async job status API.
 
+## Bugs Found and How They Were Fixed
+
+1. Blocking request lifecycle
+- Issue: `POST /analyze` performed full analysis inline, causing slow/blocking API responses.
+- Fix: Introduced Celery + Redis queue model so analysis runs in background workers.
+
+2. No async job tracking
+- Issue: No endpoint existed to monitor long-running analysis jobs.
+- Fix: Added `GET /jobs/{job_id}` with clear states: `queued`, `processing`, `completed`, `failed`.
+
+3. Shared mutable Crew objects across requests
+- Issue: Global task/agent reuse could cause cross-request state bleed in concurrent usage.
+- Fix: Refactored to per-job factory creation for agents/tasks.
+
+4. File lifecycle race condition risk
+- Issue: Uploaded files were previously tied to request lifecycle cleanup.
+- Fix: Worker now owns cleanup after job execution, preventing premature file deletion.
+
+5. Weak upload validation
+- Issue: Empty uploads and filename handling were not robust enough.
+- Fix: Added empty file checks, safer filename handling, and streamlined upload persistence.
+
 ## Project Structure
 
 ```text
