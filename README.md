@@ -23,6 +23,7 @@ This service is non-blocking by design:
 | Queue | Celery + Redis |
 | LLM Orchestration | CrewAI |
 | PDF Parsing | pypdf |
+| Database | SQLite + SQLAlchemy |
 
 ## Key Improvements Implemented
 
@@ -31,6 +32,7 @@ This service is non-blocking by design:
 - Removed shared global task/agent state by building per-job Crew objects.
 - Moved file cleanup to worker lifecycle to avoid request race issues.
 - Added explicit async job status API.
+- Added database persistence for users and analysis results.
 
 ## Bugs Found and How They Were Fixed
 
@@ -67,6 +69,8 @@ financial-document-analyzer-debug/
 |- tools.py                 # PDF text extraction tool
 |- requirements.txt
 |- .env.example
+|- database.py              # SQLAlchemy engine/session/bootstrap
+|- models.py                # User + AnalysisJob tables
 `- README.md
 ```
 
@@ -84,6 +88,7 @@ Set values:
 OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=openai/gpt-4o-mini
 REDIS_URL=redis://localhost:6379/0
+DATABASE_URL=sqlite:///./analysis.db
 ```
 
 | Variable | Required | Description |
@@ -91,6 +96,7 @@ REDIS_URL=redis://localhost:6379/0
 | `OPENAI_API_KEY` | Yes | OpenAI key used by LLM calls |
 | `OPENAI_MODEL` | No | Model name (default: `openai/gpt-4o-mini`) |
 | `REDIS_URL` | No | Redis URL (default: `redis://localhost:6379/0`) |
+| `DATABASE_URL` | No | SQLAlchemy DB URL (default: `sqlite:///./analysis.db`) |
 
 ## Quick Start
 
@@ -153,7 +159,9 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 ```bash
 curl -X POST "http://127.0.0.1:8000/analyze" \
   -F "file=@data/TSLA-Q2-2025-Update.pdf" \
-  -F "query=Summarize highlights, risks, and investment signal"
+  -F "query=Summarize highlights, risks, and investment signal" \
+  -F "user_name=Isha" \
+  -F "user_email=isha@example.com"
 ```
 
 Example response:
@@ -215,9 +223,14 @@ Queue PDF analysis job.
 - Fields:
   - `file` (required): PDF document
   - `query` (optional): analysis prompt
+  - `user_name` (optional): user display name for persistence
+  - `user_email` (optional): user identifier for persistence
 
 ### `GET /jobs/{job_id}`
 Fetch async job state and result.
+
+### `GET /users/{user_id}/jobs`
+Fetch all analysis jobs tied to a persisted user.
 
 ## Troubleshooting
 
